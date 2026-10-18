@@ -22,7 +22,7 @@
 
 `codex-panel.nvim` menghadirkan panel chat Codex langsung di Neovim. Plugin ini menjalankan `codex app-server` secara lokal dan memakai sesi login Codex CLI, sehingga kamu bisa login dengan akun ChatGPT melalui browser tanpa memasukkan API key ke konfigurasi plugin.
 
-Panel dibuat dengan Lua dan API bawaan Neovim. Tidak perlu Telescope atau plugin UI tambahan.
+Panel utama dibuat dengan Lua dan API bawaan Neovim. `dressing.nvim` menyediakan menu pilihan model dan reasoning yang dapat dinavigasi dengan tombol panah; Telescope opsional sebagai backend picker.
 
 ## Fitur
 
@@ -30,6 +30,7 @@ Panel dibuat dengan Lua dan API bawaan Neovim. Tidak perlu Telescope atau plugin
 - Login ChatGPT melalui browser memakai autentikasi Codex CLI.
 - Menampilkan akun, model aktif, reasoning effort, dan sisa usage jika tersedia dari akun.
 - Memilih model dan reasoning effort lewat menu Neovim.
+- Paste gambar clipboard atau lampirkan beberapa file/gambar; gambar dikirim sebagai input gambar dan ditampilkan di panel.
 - Riwayat percakapan lewat picker `<C-p>`.
 - Konteks file aktif dan posisi kursor saat panel dibuka dari sebuah file.
 - Persetujuan untuk aksi file/perintah Codex melalui menu Neovim.
@@ -52,7 +53,8 @@ Panel dibuat dengan Lua dan API bawaan Neovim. Tidak perlu Telescope atau plugin
 |-- assets/
 |   `-- logo.svg
 |-- lua/codex-panel/
-|   `-- init.lua       # UI panel dan integrasi Codex app-server
+|   |-- init.lua             # UI panel dan integrasi Codex app-server
+|   `-- customizations.lua   # footer, lampiran, dan preview gambar
 |-- LICENSE
 `-- README.md
 ```
@@ -63,22 +65,33 @@ Panel dibuat dengan Lua dan API bawaan Neovim. Tidak perlu Telescope atau plugin
 - [Codex CLI](https://github.com/openai/codex) terpasang dan perintah `codex` tersedia di `PATH`.
 - Login ChatGPT di Codex CLI. Jika belum login, jalankan `codex login` di terminal atau pilih `L` / `login` dari panel untuk memulai login browser.
 - `lazy.nvim` atau LazyVim untuk petunjuk instalasi di bawah.
+- [`dressing.nvim`](https://github.com/stevearc/dressing.nvim) untuk menu pilihan dengan navigasi keyboard.
+- Opsional: [`image.nvim`](https://github.com/3rd/image.nvim) untuk preview gambar di terminal yang kompatibel.
 
 > Plugin ini memakai autentikasi Codex CLI yang sudah ada. Jangan taruh token sesi atau API key di file konfigurasi.
 
 ## Instalasi di LazyVim / lazy.nvim
 
-Setelah repo tersedia di GitHub, buat file `lua/plugins/codex-panel.lua` di konfigurasi Neovim dan masukkan spec berikut. Ganti owner jika repo diunggah dengan nama akun berbeda.
+Setelah repo tersedia di GitHub, buat file `lua/plugins/codex_panel.lua` di konfigurasi Neovim dan masukkan spec berikut. Ganti owner jika repo diunggah dengan nama akun berbeda. Contoh ini memakai keymap yang sama dengan konfigurasi Nabil.
 
 ```lua
 return {
   {
     "nabil-udah-kenyang/codex-panel.nvim",
+    dependencies = { "stevearc/dressing.nvim" },
     cmd = { "CodexPanel" },
     keys = {
-      { "<leader>ac", "<cmd>CodexPanel<cr>", desc = "Toggle Codex panel" },
-      { "<leader>acm", "<cmd>CodexPanel model<cr>", desc = "Choose Codex model" },
-      { "<leader>acr", "<cmd>CodexPanel reasoning<cr>", desc = "Choose reasoning effort" },
+      { "<leader>co", "<cmd>CodexPanel<cr>", desc = "Codex: Open or toggle panel" },
+      {
+        "<leader>cc",
+        function()
+          require("codex-panel").close()
+        end,
+        desc = "Codex: Close panel",
+      },
+      { "<leader>ac", "<cmd>CodexPanel<cr>", desc = "Codex: Toggle panel (legacy)" },
+      { "<leader>acm", "<cmd>CodexPanel model<cr>", desc = "Codex: Choose model" },
+      { "<leader>acr", "<cmd>CodexPanel reasoning<cr>", desc = "Codex: Choose reasoning effort" },
     },
     config = function()
       require("codex-panel").setup()
@@ -86,6 +99,8 @@ return {
   },
 }
 ```
+
+Keymap di dalam bagian `keys` adalah contoh konfigurasi dan bebas kamu ganti. `<leader>` mengikuti nilai `mapleader` milik Neovim-mu. Keymap panel seperti `c`, `n`, `m`, dan `r` tetap tersedia terpisah.
 
 Simpan file, lalu jalankan `:Lazy sync` dan restart Neovim.
 
@@ -97,6 +112,7 @@ Untuk mencoba salinan lokal tanpa menunggu instalasi GitHub, gunakan `dir` di sp
 {
   dir = "~/Documents/codex-panel.nvim",
   name = "codex-panel.nvim",
+  dependencies = { "stevearc/dressing.nvim" },
   cmd = { "CodexPanel" },
   keys = {
     { "<leader>ac", "<cmd>CodexPanel<cr>", desc = "Toggle Codex panel" },

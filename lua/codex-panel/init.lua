@@ -936,6 +936,7 @@ function M.setup()
     end,
     desc = "Resize Codex composer and chat layout with its panel",
   })
+  require("codex-panel.customizations").setup(M)
 end
 
 return M
