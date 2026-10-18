@@ -30,6 +30,7 @@ Panel utama dibuat dengan Lua dan API bawaan Neovim. `dressing.nvim` menyediakan
 - Login ChatGPT melalui browser memakai autentikasi Codex CLI.
 - Menampilkan akun, model aktif, reasoning effort, dan sisa usage jika tersedia dari akun.
 - Memilih model dan reasoning effort lewat menu Neovim.
+- Mengingat model dan reasoning terakhir yang dipilih setelah Neovim dimulai ulang.
 - Paste gambar clipboard atau lampirkan beberapa file/gambar; gambar dikirim sebagai input gambar dan ditampilkan di panel.
 - Riwayat percakapan lewat picker `<C-p>`.
 - Konteks file aktif dan posisi kursor saat panel dibuka dari sebuah file.

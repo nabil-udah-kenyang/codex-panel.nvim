@@ -27,10 +27,15 @@ local state = {
   source_line = nil,
   highlights = {},
   placeholder_ns = nil,
+  saved_model_key = nil,
+  saved_reasoning_effort = nil,
 }
+
+local preferences_path = vim.fn.stdpath("state") .. "/codex-panel/preferences.json"
 
 local set_account_login
 local send_prompt
+local notify
 
 local function table_or_nil(value)
   if type(value) == "table" then
@@ -49,7 +54,55 @@ local function as_text(value, fallback)
   return tostring(value)
 end
 
-local function notify(message, level)
+local function load_preferences()
+  local ok, lines = pcall(vim.fn.readfile, preferences_path)
+  if not ok or type(lines) ~= "table" or #lines == 0 then
+    return
+  end
+
+  local ok, preferences = pcall(vim.json.decode, table.concat(lines, "\n"))
+  if not ok or type(preferences) ~= "table" then
+    return
+  end
+
+  if type(preferences.model) == "string" and preferences.model ~= "" then
+    state.saved_model_key = preferences.model
+  end
+  if type(preferences.reasoning_effort) == "string" and preferences.reasoning_effort ~= "" then
+    state.saved_reasoning_effort = preferences.reasoning_effort
+  end
+end
+
+local function save_preferences()
+  local model_key = state.model and (state.model.id or state.model.model)
+  if type(model_key) ~= "string" or model_key == "" then
+    return
+  end
+
+  local ok, err = pcall(function()
+    vim.fn.mkdir(vim.fn.fnamemodify(preferences_path, ":h"), "p")
+    local temporary_path = preferences_path .. ".tmp"
+    local preferences = {
+      model = model_key,
+      reasoning_effort = state.reasoning_effort,
+    }
+    assert(vim.fn.writefile({ vim.json.encode(preferences) }, temporary_path) == 0, "write failed")
+    if vim.fn.rename(temporary_path, preferences_path) ~= 0 then
+      vim.fn.delete(temporary_path)
+      error("rename failed")
+    end
+  end)
+
+  if not ok then
+    notify("Could not save model preferences: " .. tostring(err), vim.log.levels.WARN)
+    return
+  end
+
+  state.saved_model_key = model_key
+  state.saved_reasoning_effort = state.reasoning_effort
+end
+
+notify = function(message, level)
   vim.schedule(function()
     vim.notify("Codex: " .. message, level or vim.log.levels.INFO)
   end)
@@ -216,12 +269,34 @@ local function load_models()
   rpc("model/list", { includeHidden = false, limit = 100 }, function(result)
     result = table_or_nil(result)
     state.models = result and table_or_nil(result.data) or {}
+
+    if not state.model and state.saved_model_key then
+      for _, model in ipairs(state.models) do
+        if model.id == state.saved_model_key or model.model == state.saved_model_key then
+          state.model = model
+          break
+        end
+      end
+    end
+
     if not state.model then
       for _, model in ipairs(state.models) do
         if model.isDefault then
           state.model = model
-          state.reasoning_effort = model.defaultReasoningEffort
           break
+        end
+      end
+    end
+
+    if state.model then
+      state.reasoning_effort = state.model.defaultReasoningEffort
+      if state.saved_reasoning_effort then
+        for _, option in ipairs(state.model.supportedReasoningEfforts or {}) do
+          local effort = type(option) == "table" and option.reasoningEffort or option
+          if effort == state.saved_reasoning_effort then
+            state.reasoning_effort = effort
+            break
+          end
         end
       end
     end
@@ -247,6 +322,7 @@ local function pick_model()
     end
     state.model = model
     state.reasoning_effort = model.defaultReasoningEffort
+    save_preferences()
     state.status = "Model: " .. as_text(model.displayName or model.model or model.id)
     M.render()
     focus_composer()
@@ -276,6 +352,7 @@ local function pick_reasoning()
       return
     end
     state.reasoning_effort = option.reasoningEffort or option
+    save_preferences()
     state.status = "Reasoning: " .. as_text(state.reasoning_effort)
     M.render()
     focus_composer()
@@ -913,6 +990,7 @@ function M.command(args)
 end
 
 function M.setup()
+  load_preferences()
   vim.api.nvim_create_user_command("CodexPanel", M.command, {
     nargs = "?",
     complete = function()
